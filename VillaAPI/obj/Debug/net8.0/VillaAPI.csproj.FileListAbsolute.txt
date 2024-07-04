@@ -30,3 +30,4 @@ C:\Users\SoftClansUser\RiderProjects\MagicVilla\VillaAPI\obj\Debug\net8.0\refint
 C:\Users\SoftClansUser\RiderProjects\MagicVilla\VillaAPI\obj\Debug\net8.0\VillaAPI.pdb
 C:\Users\SoftClansUser\RiderProjects\MagicVilla\VillaAPI\obj\Debug\net8.0\VillaAPI.genruntimeconfig.cache
 C:\Users\SoftClansUser\RiderProjects\MagicVilla\VillaAPI\obj\Debug\net8.0\ref\VillaAPI.dll
+C:\Users\SoftClansUser\RiderProjects\MagicVilla\VillaAPI\obj\Debug\net8.0\VillaAPI.sourcelink.json
