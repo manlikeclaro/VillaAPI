@@ -9,14 +9,25 @@ namespace VillaAPI.Controllers;
 public class VillaApiController : ControllerBase
 {
     [HttpGet]
-    public IEnumerable<VillaDto> GetVillas()
+    public ActionResult<VillaDto> GetVillas()
     {
-        return VillaStore.VillaList;
+        return Ok(VillaStore.VillaList);
     }
 
     [HttpGet("{Id}")]
-    public VillaDto? Get(int? Id)
+    public ActionResult<VillaDto> Get(int Id)
     {
-        return VillaStore.VillaList.FirstOrDefault(u => u.Id == Id);
+        if (Id != 0)
+        {
+            var Villa = VillaStore.VillaList.FirstOrDefault(u => u.Id == Id);
+            if (Villa != null)
+            {
+                return Ok(Villa);
+            }
+
+            return NotFound();
+        }
+
+        return BadRequest();
     }
 }
