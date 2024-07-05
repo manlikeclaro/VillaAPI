@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.JsonPatch;
+using Microsoft.AspNetCore.Mvc;
 using VillaAPI.Data;
 using VillaAPI.Models.Dto;
 
@@ -109,7 +110,7 @@ public class VillaApiController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public ActionResult<VillaDto> UpdateVilla(int id, [FromBody] VillaDto updatedVilla)
+    public ActionResult<VillaDto> UpdateVilla(int id, JsonPatchDocument<VillaDto> updatedVilla)
     {
         // Validate the Id
         if (id <= 0)
@@ -126,18 +127,36 @@ public class VillaApiController : ControllerBase
             return NotFound();
         }
 
-        var nameExists = VillaStore.VillaList.FirstOrDefault(u => u.Name.ToLower() == updatedVilla.Name.ToLower());
-        if (nameExists != null)
+        // Create a copy to apply the patch and check if the Id is being modified
+        var originalVilla = new VillaDto
         {
-            ModelState.AddModelError("Validation Error", $"The name '{updatedVilla.Name}' already exists!");
+            Id = identifiedVilla.Id,
+            Name = identifiedVilla.Name,
+            // Add other properties as needed
+        };
+        updatedVilla.ApplyTo(originalVilla, ModelState);
+
+        // Check if Id is modified
+        if (originalVilla.Id != id)
+        {
+            ModelState.AddModelError("Validation Error", "Id field cannot be modified.");
+            return BadRequest(ModelState);
+        }
+
+        // Check for name conflicts
+        var nameExists = VillaStore.VillaList.FirstOrDefault(u => u.Name.ToLower() == originalVilla.Name.ToLower());
+        if (nameExists != null && nameExists.Id != id)
+        {
+            ModelState.AddModelError("Validation Error", $"The name '{originalVilla.Name}' already exists!");
             return Conflict(ModelState);
         }
 
-        // Update the villa details
-        identifiedVilla.Name = updatedVilla.Name;
-        identifiedVilla.Bedrooms = updatedVilla.Bedrooms;
-        identifiedVilla.Bathrooms = updatedVilla.Bathrooms;
-        identifiedVilla.PricePerNight = updatedVilla.PricePerNight;
+        // Apply the patch to the identified villa
+        updatedVilla.ApplyTo(identifiedVilla, ModelState);
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
 
         // Return the updated villa
         return Ok(identifiedVilla);

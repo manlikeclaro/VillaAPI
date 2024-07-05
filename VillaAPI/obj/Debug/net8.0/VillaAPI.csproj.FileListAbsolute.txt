@@ -31,3 +31,7 @@ C:\Users\SoftClansUser\RiderProjects\MagicVilla\VillaAPI\obj\Debug\net8.0\VillaA
 C:\Users\SoftClansUser\RiderProjects\MagicVilla\VillaAPI\obj\Debug\net8.0\VillaAPI.genruntimeconfig.cache
 C:\Users\SoftClansUser\RiderProjects\MagicVilla\VillaAPI\obj\Debug\net8.0\ref\VillaAPI.dll
 C:\Users\SoftClansUser\RiderProjects\MagicVilla\VillaAPI\obj\Debug\net8.0\VillaAPI.sourcelink.json
+C:\Users\SoftClansUser\RiderProjects\MagicVilla\VillaAPI\bin\Debug\net8.0\Microsoft.AspNetCore.JsonPatch.dll
+C:\Users\SoftClansUser\RiderProjects\MagicVilla\VillaAPI\bin\Debug\net8.0\Microsoft.AspNetCore.Mvc.NewtonsoftJson.dll
+C:\Users\SoftClansUser\RiderProjects\MagicVilla\VillaAPI\bin\Debug\net8.0\Newtonsoft.Json.dll
+C:\Users\SoftClansUser\RiderProjects\MagicVilla\VillaAPI\bin\Debug\net8.0\Newtonsoft.Json.Bson.dll
