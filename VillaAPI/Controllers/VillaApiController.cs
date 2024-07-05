@@ -9,13 +9,22 @@ namespace VillaAPI.Controllers;
 [Route("api/VillaApi")]
 public class VillaApiController : ControllerBase
 {
+    private readonly ILogger<VillaApiController> _logger;
+
+    public VillaApiController(ILogger<VillaApiController> logger)
+    {
+        _logger = logger;
+    }
+
     // GET: api/VillaApi
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<VillaDto> GetVillas()
     {
         // Return all villas
-        return Ok(VillaStore.VillaList);
+        var villas = VillaStore.VillaList.ToList();
+        _logger.LogInformation($"Successfully retrieved {villas.Count} villas");
+        return Ok(villas);
     }
 
     // GET: api/VillaApi/{id}
@@ -28,19 +37,20 @@ public class VillaApiController : ControllerBase
         // Validate the Id
         if (id <= 0)
         {
-            return BadRequest(@"{
-                ""Error"": ""Invalid ID""
-            }");
+            _logger.LogError("Invalid ID provided");
+            return BadRequest(new { Error = "Invalid ID provided" });
         }
 
         // Find the villa by Id
         var villa = VillaStore.VillaList.FirstOrDefault(u => u.Id == id);
         if (villa == null)
         {
+            _logger.LogWarning($"Villa with ID {id} not found");
             return NotFound();
         }
 
         // Return the found villa
+        _logger.LogInformation($"Successfully retrieved villa with ID: {id}");
         return Ok(villa);
     }
 
@@ -53,6 +63,7 @@ public class VillaApiController : ControllerBase
         // Validate the request body
         if (!ModelState.IsValid)
         {
+            _logger.LogError("Invalid model state for creating villa");
             return BadRequest(ModelState);
         }
 
@@ -60,6 +71,7 @@ public class VillaApiController : ControllerBase
         var nameExists = VillaStore.VillaList.FirstOrDefault(u => u.Name.ToLower() == villaDetails.Name.ToLower());
         if (nameExists != null)
         {
+            _logger.LogWarning($"Villa with name '{villaDetails.Name}' already exists");
             ModelState.AddModelError("Validation Error", $"The name '{villaDetails.Name}' already exists!");
             return BadRequest(ModelState);
         }
@@ -72,6 +84,7 @@ public class VillaApiController : ControllerBase
         VillaStore.VillaList.Add(villaDetails);
 
         // Return the created villa
+        _logger.LogInformation($"Successfully created villa with ID: {villaDetails.Id}");
         return CreatedAtRoute("GetVilla", new { id = villaDetails.Id }, villaDetails);
     }
 
@@ -85,15 +98,15 @@ public class VillaApiController : ControllerBase
         // Validate the Id
         if (id <= 0)
         {
-            return BadRequest(@"{
-                ""Error"": ""Invalid ID""
-            }");
+            _logger.LogError("Invalid ID provided");
+            return BadRequest(new { Error = "Invalid ID provided" });
         }
 
         // Find the villa by Id
         var identifiedVilla = VillaStore.VillaList.FirstOrDefault(u => u.Id == id);
         if (identifiedVilla == null)
         {
+            _logger.LogWarning($"Villa with ID {id} not found");
             return NotFound();
         }
 
@@ -101,6 +114,7 @@ public class VillaApiController : ControllerBase
         VillaStore.VillaList.Remove(identifiedVilla);
 
         // Return no content status
+        _logger.LogInformation($"Successfully deleted villa with ID: {id}");
         return NoContent();
     }
 
@@ -115,15 +129,15 @@ public class VillaApiController : ControllerBase
         // Validate the Id
         if (id <= 0)
         {
-            return BadRequest(@"{
-                ""Error"": ""Invalid ID""
-            }");
+            _logger.LogError("Invalid ID provided");
+            return BadRequest(new { Error = "Invalid ID provided" });
         }
 
         // Find the villa by Id
         var identifiedVilla = VillaStore.VillaList.FirstOrDefault(u => u.Id == id);
         if (identifiedVilla == null)
         {
+            _logger.LogWarning($"Villa with ID {id} not found");
             return NotFound();
         }
 
@@ -139,6 +153,7 @@ public class VillaApiController : ControllerBase
         // Check if Id is modified
         if (originalVilla.Id != id)
         {
+            _logger.LogError("Id field cannot be modified");
             ModelState.AddModelError("Validation Error", "Id field cannot be modified.");
             return BadRequest(ModelState);
         }
@@ -147,6 +162,7 @@ public class VillaApiController : ControllerBase
         var nameExists = VillaStore.VillaList.FirstOrDefault(u => u.Name.ToLower() == originalVilla.Name.ToLower());
         if (nameExists != null && nameExists.Id != id)
         {
+            _logger.LogWarning($"Villa with name '{originalVilla.Name}' already exists");
             ModelState.AddModelError("Validation Error", $"The name '{originalVilla.Name}' already exists!");
             return Conflict(ModelState);
         }
@@ -155,10 +171,12 @@ public class VillaApiController : ControllerBase
         updatedVilla.ApplyTo(identifiedVilla, ModelState);
         if (!ModelState.IsValid)
         {
+            _logger.LogError("Invalid model state for updating villa");
             return BadRequest(ModelState);
         }
 
         // Return the updated villa
+        _logger.LogInformation($"Successfully updated villa with ID: {id}");
         return Ok(identifiedVilla);
     }
 
@@ -172,15 +190,15 @@ public class VillaApiController : ControllerBase
         // Validate the Id
         if (id <= 0)
         {
-            return BadRequest(@"{
-                ""Error"": ""Invalid ID""
-            }");
+            _logger.LogError("Invalid ID provided");
+            return BadRequest(new { Error = "Invalid ID" });
         }
 
         // Find the villa by Id
         var identifiedVilla = VillaStore.VillaList.FirstOrDefault(u => u.Id == id);
         if (identifiedVilla == null)
         {
+            _logger.LogWarning($"Villa with ID {id} not found");
             return NotFound();
         }
 
@@ -188,6 +206,7 @@ public class VillaApiController : ControllerBase
         var nameExists = VillaStore.VillaList.FirstOrDefault(u => u.Name.ToLower() == villaDetails.Name.ToLower());
         if (nameExists != null && nameExists.Id != id)
         {
+            _logger.LogWarning($"Villa with name '{villaDetails.Name}' already exists");
             ModelState.AddModelError("Validation Error", $"The name '{villaDetails.Name}' already exists!");
             return Conflict(ModelState);
         }
@@ -200,6 +219,7 @@ public class VillaApiController : ControllerBase
         identifiedVilla.PricePerNight = villaDetails.PricePerNight;
 
         // Return the updated villa
+        _logger.LogInformation($"Successfully updated villa with ID: {id}");
         return Ok(identifiedVilla);
     }
 }
