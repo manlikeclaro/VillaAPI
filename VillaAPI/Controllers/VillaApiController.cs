@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.ModelBinding;
+﻿using Microsoft.AspNetCore.Mvc;
 using VillaAPI.Data;
 using VillaAPI.Models.Dto;
 
@@ -10,145 +8,179 @@ namespace VillaAPI.Controllers;
 [Route("api/VillaApi")]
 public class VillaApiController : ControllerBase
 {
+    // GET: api/VillaApi
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<VillaDto> GetVillas()
     {
+        // Return all villas
         return Ok(VillaStore.VillaList);
     }
 
-    [HttpGet("{Id}", Name = "GetVilla")]
+    // GET: api/VillaApi/{id}
+    [HttpGet("{id:int}", Name = "GetVilla")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult<VillaDto> GetVilla(int Id)
+    public ActionResult<VillaDto> GetVilla(int id)
     {
-        if (Id != 0)
+        // Validate the Id
+        if (id <= 0)
         {
-            var Villa = VillaStore.VillaList.FirstOrDefault(u => u.Id == Id);
-            if (Villa != null)
-            {
-                return Ok(Villa);
-            }
+            return BadRequest(@"{
+                ""Error"": ""Invalid ID""
+            }");
+        }
 
+        // Find the villa by Id
+        var villa = VillaStore.VillaList.FirstOrDefault(u => u.Id == id);
+        if (villa == null)
+        {
             return NotFound();
         }
 
-        return BadRequest();
+        // Return the found villa
+        return Ok(villa);
     }
 
+    // POST: api/VillaApi
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public ActionResult<VillaDto> CreateVilla([FromBody] VillaDto? VillaDetails)
+    public ActionResult<VillaDto> CreateVilla([FromBody] VillaDto villaDetails)
     {
-        if (VillaDetails == null)
+        // Validate the request body
+        if (!ModelState.IsValid)
         {
-            return BadRequest();
-        }
-
-        var nameExists = VillaStore.VillaList.FirstOrDefault(u => u.Name.ToLower() == VillaDetails.Name.ToLower());
-        if (nameExists != null)
-        {
-            ModelState.AddModelError("Validation Error", $"The name '{VillaDetails.Name}' already exists!");
             return BadRequest(ModelState);
         }
 
-        var lastVilla = VillaStore.VillaList.OrderByDescending(u => u.Id).FirstOrDefault();
-        VillaDetails.Id = (lastVilla != null ? lastVilla.Id : 0) + 1;
-        VillaStore.VillaList.Add(VillaDetails);
+        // Check if a villa with the same name already exists
+        var nameExists = VillaStore.VillaList.FirstOrDefault(u => u.Name.ToLower() == villaDetails.Name.ToLower());
+        if (nameExists != null)
+        {
+            ModelState.AddModelError("Validation Error", $"The name '{villaDetails.Name}' already exists!");
+            return BadRequest(ModelState);
+        }
 
-        // return Created("GetVilla", VillaDetails);
-        return CreatedAtRoute("GetVilla", new { id = VillaDetails.Id }, VillaDetails);
+        // Generate new Id for the villa
+        var lastVilla = VillaStore.VillaList.OrderByDescending(u => u.Id).FirstOrDefault();
+        villaDetails.Id = (lastVilla?.Id ?? 0) + 1;
+
+        // Add the new villa to the store
+        VillaStore.VillaList.Add(villaDetails);
+
+        // Return the created villa
+        return CreatedAtRoute("GetVilla", new { id = villaDetails.Id }, villaDetails);
     }
 
-    [HttpDelete("{Id}")]
+    // DELETE: api/VillaApi/{id}
+    [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult<VillaDto> DeleteVilla(int Id)
+    public IActionResult DeleteVilla(int id)
     {
-        if (Id <= 0)
+        // Validate the Id
+        if (id <= 0)
         {
-            var identifiedVilla = VillaStore.VillaList.FirstOrDefault(u => u.Id == Id);
-
-            if (identifiedVilla == null)
-            {
-                return NotFound();
-            }
-
-            VillaStore.VillaList.Remove(identifiedVilla);
-            return NoContent();
+            return BadRequest(@"{
+                ""Error"": ""Invalid ID""
+            }");
         }
 
-        return BadRequest();
+        // Find the villa by Id
+        var identifiedVilla = VillaStore.VillaList.FirstOrDefault(u => u.Id == id);
+        if (identifiedVilla == null)
+        {
+            return NotFound();
+        }
+
+        // Remove the villa from the store
+        VillaStore.VillaList.Remove(identifiedVilla);
+
+        // Return no content status
+        return NoContent();
     }
 
-    [HttpPatch("{Id}")]
+    // PATCH: api/VillaApi/{id}
+    [HttpPatch("{id:int}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status405MethodNotAllowed)]
-    public ActionResult<VillaDto> UpdateVilla(int Id, [FromBody] VillaDto? updatedVilla)
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public ActionResult<VillaDto> UpdateVilla(int id, [FromBody] VillaDto updatedVilla)
     {
-        if (Id != 0 && Id > 0 && updatedVilla != null)
+        // Validate the Id
+        if (id <= 0)
         {
-            // var identifiedVilla = VillaStore.VillaList.FirstOrDefault(u => u.Id == Id);
-            var identifiedVilla = VillaStore.VillaList.Find(u => u.Id == Id);
-
-            if (identifiedVilla == null)
-            {
-                return NotFound();
-            }
-
-            var nameExists = VillaStore.VillaList.FirstOrDefault(u => u.Name.ToLower() == updatedVilla.Name.ToLower());
-            if (nameExists != null)
-            {
-                ModelState.AddModelError("Validation Error", $"The name '{updatedVilla.Name}' already exists!");
-                return Conflict(ModelState);
-            }
-
-            identifiedVilla.Name = updatedVilla.Name;
-            identifiedVilla.Bedrooms = updatedVilla.Bedrooms;
-            identifiedVilla.Bathrooms = updatedVilla.Bathrooms;
-            identifiedVilla.PricePerNight = updatedVilla.PricePerNight;
-            return Ok(identifiedVilla);
+            return BadRequest(@"{
+                ""Error"": ""Invalid ID""
+            }");
         }
 
-        return BadRequest();
+        // Find the villa by Id
+        var identifiedVilla = VillaStore.VillaList.FirstOrDefault(u => u.Id == id);
+        if (identifiedVilla == null)
+        {
+            return NotFound();
+        }
+
+        var nameExists = VillaStore.VillaList.FirstOrDefault(u => u.Name.ToLower() == updatedVilla.Name.ToLower());
+        if (nameExists != null)
+        {
+            ModelState.AddModelError("Validation Error", $"The name '{updatedVilla.Name}' already exists!");
+            return Conflict(ModelState);
+        }
+
+        // Update the villa details
+        identifiedVilla.Name = updatedVilla.Name;
+        identifiedVilla.Bedrooms = updatedVilla.Bedrooms;
+        identifiedVilla.Bathrooms = updatedVilla.Bathrooms;
+        identifiedVilla.PricePerNight = updatedVilla.PricePerNight;
+
+        // Return the updated villa
+        return Ok(identifiedVilla);
     }
 
-    [HttpPut("{Id}")]
+    // PUT: api/VillaApi/{id}
+    [HttpPut("{id:int}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult<VillaDto> PutVilla(int? Id, VillaDto? villaDetails)
+    public ActionResult<VillaDto> PutVilla(int id, [FromBody] VillaDto villaDetails)
     {
-        if (Id > 0 && Id != 0)
+        // Validate the Id
+        if (id <= 0)
         {
-            var identifiedVilla = VillaStore.VillaList.FirstOrDefault(u => u.Id == Id);
-
-            if (identifiedVilla == null)
-            {
-                return NotFound();
-            }
-
-            identifiedVilla.Name = villaDetails.Name;
-            identifiedVilla.Location = villaDetails.Location;
-            identifiedVilla.Bedrooms = villaDetails.Bedrooms;
-            identifiedVilla.Bathrooms = villaDetails.Bathrooms;
-            identifiedVilla.PricePerNight = villaDetails.PricePerNight;
-            
-            // // Copy properties from villaDetails to identifiedVilla
-            // foreach (var property in typeof(VillaDto).GetProperties())
-            // {
-            //     var value = property.GetValue(villaDetails);
-            //     property.SetValue(identifiedVilla, value);
-            // }
-            
-            return Ok(identifiedVilla);
+            return BadRequest(@"{
+                ""Error"": ""Invalid ID""
+            }");
         }
 
-        return BadRequest();
+        // Find the villa by Id
+        var identifiedVilla = VillaStore.VillaList.FirstOrDefault(u => u.Id == id);
+        if (identifiedVilla == null)
+        {
+            return NotFound();
+        }
+
+        // Check if a villa with the same name already exists
+        var nameExists = VillaStore.VillaList.FirstOrDefault(u => u.Name.ToLower() == villaDetails.Name.ToLower());
+        if (nameExists != null && nameExists.Id != id)
+        {
+            ModelState.AddModelError("Validation Error", $"The name '{villaDetails.Name}' already exists!");
+            return Conflict(ModelState);
+        }
+
+        // Update the villa details
+        identifiedVilla.Name = villaDetails.Name;
+        identifiedVilla.Location = villaDetails.Location;
+        identifiedVilla.Bedrooms = villaDetails.Bedrooms;
+        identifiedVilla.Bathrooms = villaDetails.Bathrooms;
+        identifiedVilla.PricePerNight = villaDetails.PricePerNight;
+
+        // Return the updated villa
+        return Ok(identifiedVilla);
     }
 }
