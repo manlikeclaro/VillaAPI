@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
-using VillaAPI.Data;
+using VillaAPI.Models;
 using VillaAPI.Models.Dto;
 
 namespace VillaAPI.Controllers;
@@ -10,10 +10,12 @@ namespace VillaAPI.Controllers;
 public class VillaApiController : ControllerBase
 {
     private readonly ILogger<VillaApiController> _logger;
+    private readonly ApplicationDbContext _db;
 
-    public VillaApiController(ILogger<VillaApiController> logger)
+    public VillaApiController(ILogger<VillaApiController> logger, ApplicationDbContext db)
     {
         _logger = logger;
+        _db = db;
     }
 
     // GET: api/VillaApi
@@ -22,7 +24,7 @@ public class VillaApiController : ControllerBase
     public ActionResult<VillaDto> GetVillas()
     {
         // Return all villas
-        var villas = VillaStore.VillaList.ToList();
+        var villas = _db.Villas.ToList();
         _logger.LogInformation($"Successfully retrieved {villas.Count} villas");
         return Ok(villas);
     }
@@ -42,7 +44,7 @@ public class VillaApiController : ControllerBase
         }
 
         // Find the villa by Id
-        var villa = VillaStore.VillaList.FirstOrDefault(u => u.Id == id);
+        var villa = _db.Villas.FirstOrDefault(u => u.Id == id);
         if (villa == null)
         {
             _logger.LogWarning($"Villa with ID {id} not found");
@@ -68,7 +70,7 @@ public class VillaApiController : ControllerBase
         }
 
         // Check if a villa with the same name already exists
-        var nameExists = VillaStore.VillaList.FirstOrDefault(u => u.Name.ToLower() == villaDetails.Name.ToLower());
+        var nameExists = _db.Villas.FirstOrDefault(u => u.Name.ToLower() == villaDetails.Name.ToLower());
         if (nameExists != null)
         {
             _logger.LogWarning($"Villa with name '{villaDetails.Name}' already exists");
@@ -76,12 +78,22 @@ public class VillaApiController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        // Generate new Id for the villa
-        var lastVilla = VillaStore.VillaList.OrderByDescending(u => u.Id).FirstOrDefault();
-        villaDetails.Id = (lastVilla?.Id ?? 0) + 1;
+        var villaModel = new Villa()
+        {
+            Id = villaDetails.Id,
+            Name = villaDetails.Name,
+            Details = villaDetails.Details,
+            Rate = villaDetails.Rate,
+            SquareFeet = villaDetails.SquareFeet,
+            Occupancy = villaDetails.Occupancy,
+            ImgUrl = villaDetails.ImgUrl,
+            Amenity = villaDetails.Amenity,
+            Created = DateTime.Now,
+        };
 
         // Add the new villa to the store
-        VillaStore.VillaList.Add(villaDetails);
+        _db.Villas.Add(villaModel);
+        _db.SaveChanges();
 
         // Return the created villa
         _logger.LogInformation($"Successfully created villa with ID: {villaDetails.Id}");
@@ -103,7 +115,7 @@ public class VillaApiController : ControllerBase
         }
 
         // Find the villa by Id
-        var identifiedVilla = VillaStore.VillaList.FirstOrDefault(u => u.Id == id);
+        var identifiedVilla = _db.Villas.FirstOrDefault(u => u.Id == id);
         if (identifiedVilla == null)
         {
             _logger.LogWarning($"Villa with ID {id} not found");
@@ -111,7 +123,8 @@ public class VillaApiController : ControllerBase
         }
 
         // Remove the villa from the store
-        VillaStore.VillaList.Remove(identifiedVilla);
+        _db.Villas.Remove(identifiedVilla);
+        _db.SaveChanges();
 
         // Return no content status
         _logger.LogInformation($"Successfully deleted villa with ID: {id}");
@@ -134,7 +147,7 @@ public class VillaApiController : ControllerBase
         }
 
         // Find the villa by Id
-        var identifiedVilla = VillaStore.VillaList.FirstOrDefault(u => u.Id == id);
+        var identifiedVilla = _db.Villas.FirstOrDefault(u => u.Id == id);
         if (identifiedVilla == null)
         {
             _logger.LogWarning($"Villa with ID {id} not found");
@@ -146,7 +159,12 @@ public class VillaApiController : ControllerBase
         {
             Id = identifiedVilla.Id,
             Name = identifiedVilla.Name,
-            // Add other properties as needed
+            Details = identifiedVilla.Details,
+            Rate = identifiedVilla.Rate,
+            SquareFeet = identifiedVilla.SquareFeet,
+            Occupancy = identifiedVilla.Occupancy,
+            ImgUrl = identifiedVilla.ImgUrl,
+            Amenity = identifiedVilla.Amenity
         };
         updatedVilla.ApplyTo(originalVilla, ModelState);
 
@@ -159,7 +177,7 @@ public class VillaApiController : ControllerBase
         }
 
         // Check for name conflicts
-        var nameExists = VillaStore.VillaList.FirstOrDefault(u => u.Name.ToLower() == originalVilla.Name.ToLower());
+        var nameExists = _db.Villas.FirstOrDefault(u => u.Name.ToLower() == originalVilla.Name.ToLower());
         if (nameExists != null && nameExists.Id != id)
         {
             _logger.LogWarning($"Villa with name '{originalVilla.Name}' already exists");
@@ -167,13 +185,22 @@ public class VillaApiController : ControllerBase
             return Conflict(ModelState);
         }
 
-        // Apply the patch to the identified villa
-        updatedVilla.ApplyTo(identifiedVilla, ModelState);
+        // Map changes from DTO back to entity
+        identifiedVilla.Name = originalVilla.Name;
+        identifiedVilla.Details = originalVilla.Details;
+        identifiedVilla.Rate = originalVilla.Rate;
+        identifiedVilla.SquareFeet = originalVilla.SquareFeet;
+        identifiedVilla.Occupancy = originalVilla.Occupancy;
+        identifiedVilla.ImgUrl = originalVilla.ImgUrl;
+        identifiedVilla.Amenity = originalVilla.Amenity;
+        identifiedVilla.Updated = DateTime.Now;
+        
         if (!ModelState.IsValid)
         {
             _logger.LogError("Invalid model state for updating villa");
             return BadRequest(ModelState);
         }
+        _db.SaveChanges();
 
         // Return the updated villa
         _logger.LogInformation($"Successfully updated villa with ID: {id}");
@@ -195,7 +222,7 @@ public class VillaApiController : ControllerBase
         }
 
         // Find the villa by Id
-        var identifiedVilla = VillaStore.VillaList.FirstOrDefault(u => u.Id == id);
+        var identifiedVilla = _db.Villas.FirstOrDefault(u => u.Id == id);
         if (identifiedVilla == null)
         {
             _logger.LogWarning($"Villa with ID {id} not found");
@@ -203,7 +230,7 @@ public class VillaApiController : ControllerBase
         }
 
         // Check if a villa with the same name already exists
-        var nameExists = VillaStore.VillaList.FirstOrDefault(u => u.Name.ToLower() == villaDetails.Name.ToLower());
+        var nameExists = _db.Villas.FirstOrDefault(u => u.Name.ToLower() == villaDetails.Name.ToLower());
         if (nameExists != null && nameExists.Id != id)
         {
             _logger.LogWarning($"Villa with name '{villaDetails.Name}' already exists");
@@ -213,10 +240,16 @@ public class VillaApiController : ControllerBase
 
         // Update the villa details
         identifiedVilla.Name = villaDetails.Name;
-        identifiedVilla.Location = villaDetails.Location;
-        identifiedVilla.Bedrooms = villaDetails.Bedrooms;
-        identifiedVilla.Bathrooms = villaDetails.Bathrooms;
-        identifiedVilla.PricePerNight = villaDetails.PricePerNight;
+        identifiedVilla.Details = villaDetails.Details;
+        identifiedVilla.Rate = villaDetails.Rate;
+        identifiedVilla.SquareFeet = villaDetails.SquareFeet;
+        identifiedVilla.Occupancy = villaDetails.Occupancy;
+        identifiedVilla.ImgUrl = villaDetails.ImgUrl;
+        identifiedVilla.Amenity = villaDetails.Amenity;
+        identifiedVilla.Updated = DateTime.Now;
+        
+        _db.Villas.Update(identifiedVilla);
+        _db.SaveChanges();
 
         // Return the updated villa
         _logger.LogInformation($"Successfully updated villa with ID: {id}");
