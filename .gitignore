@@ -1,2 +1,25 @@
-﻿.idea
-.vs
+﻿# Ignore build outputs and temporary files
+bin/
+obj/
+debug/
+release/
+
+# Ignore Rider files
+.idea/
+*.sln.iml
+
+# Ignore Visual Studio files
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.rsuser
+
+# Ignore compiled files
+*.dll
+*.exe
+
+# Ignore OS generated files
+.DS_Store
+Thumbs.db
