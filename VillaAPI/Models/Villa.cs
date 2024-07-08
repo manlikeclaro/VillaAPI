@@ -33,6 +33,5 @@ public class Villa
     [Required] 
     public DateTime Created { get; set; }
     
-    [Required] 
     public DateTime Updated { get; set; }
 }

@@ -60,7 +60,7 @@ public class VillaApiController : ControllerBase
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public ActionResult<VillaDto> CreateVilla([FromBody] VillaDto villaDetails)
+    public ActionResult<VillaDto> CreateVilla([FromBody] VillaCreateDto villaDetails)
     {
         // Validate the request body
         if (!ModelState.IsValid)
@@ -80,7 +80,6 @@ public class VillaApiController : ControllerBase
 
         var villaModel = new Villa()
         {
-            Id = villaDetails.Id,
             Name = villaDetails.Name,
             Details = villaDetails.Details,
             Rate = villaDetails.Rate,
@@ -96,8 +95,8 @@ public class VillaApiController : ControllerBase
         _db.SaveChanges();
 
         // Return the created villa
-        _logger.LogInformation($"Successfully created villa with ID: {villaDetails.Id}");
-        return CreatedAtRoute("GetVilla", new { id = villaDetails.Id }, villaDetails);
+        _logger.LogInformation($"Successfully created villa with ID: {villaModel.Id}");
+        return CreatedAtRoute("GetVilla", new { id = villaModel.Id }, villaDetails);
     }
 
     // DELETE: api/VillaApi/{id}
@@ -137,7 +136,7 @@ public class VillaApiController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public ActionResult<VillaDto> UpdateVilla(int id, JsonPatchDocument<VillaDto> updatedVilla)
+    public ActionResult<VillaDto> UpdateVilla(int id, JsonPatchDocument<VillaUpdateDto> updatedVilla)
     {
         // Validate the Id
         if (id <= 0)
@@ -154,10 +153,9 @@ public class VillaApiController : ControllerBase
             return NotFound();
         }
 
-        // Create a copy to apply the patch and check if the Id is being modified
-        var originalVilla = new VillaDto
+        // Create a copy to apply the patch and check conflicts
+        var originalVilla = new VillaUpdateDto()
         {
-            Id = identifiedVilla.Id,
             Name = identifiedVilla.Name,
             Details = identifiedVilla.Details,
             Rate = identifiedVilla.Rate,
@@ -167,14 +165,6 @@ public class VillaApiController : ControllerBase
             Amenity = identifiedVilla.Amenity
         };
         updatedVilla.ApplyTo(originalVilla, ModelState);
-
-        // Check if Id is modified
-        if (originalVilla.Id != id)
-        {
-            _logger.LogError("Id field cannot be modified");
-            ModelState.AddModelError("Validation Error", "Id field cannot be modified.");
-            return BadRequest(ModelState);
-        }
 
         // Check for name conflicts
         var nameExists = _db.Villas.FirstOrDefault(u => u.Name.ToLower() == originalVilla.Name.ToLower());
@@ -212,7 +202,7 @@ public class VillaApiController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult<VillaDto> PutVilla(int id, [FromBody] VillaDto villaDetails)
+    public ActionResult<VillaDto> PutVilla(int id, [FromBody] VillaUpdateDto villaDetails)
     {
         // Validate the Id
         if (id <= 0)
@@ -239,13 +229,20 @@ public class VillaApiController : ControllerBase
         }
 
         // Update the villa details
-        identifiedVilla.Name = villaDetails.Name;
-        identifiedVilla.Details = villaDetails.Details;
-        identifiedVilla.Rate = villaDetails.Rate;
-        identifiedVilla.SquareFeet = villaDetails.SquareFeet;
-        identifiedVilla.Occupancy = villaDetails.Occupancy;
-        identifiedVilla.ImgUrl = villaDetails.ImgUrl;
-        identifiedVilla.Amenity = villaDetails.Amenity;
+        identifiedVilla.Name = (identifiedVilla.Name != villaDetails.Name) 
+            ? villaDetails.Name : identifiedVilla.Name;
+        identifiedVilla.Details = (identifiedVilla.Details != villaDetails.Details) 
+            ? villaDetails.Details : identifiedVilla.Details;
+        identifiedVilla.Rate = (identifiedVilla.Rate != villaDetails.Rate) 
+            ? villaDetails.Rate : identifiedVilla.Rate;
+        identifiedVilla.SquareFeet = (identifiedVilla.SquareFeet != villaDetails.SquareFeet) 
+            ? villaDetails.SquareFeet : identifiedVilla.SquareFeet;
+        identifiedVilla.Occupancy = (identifiedVilla.Occupancy != villaDetails.Occupancy) 
+            ? villaDetails.Occupancy : identifiedVilla.Occupancy;
+        identifiedVilla.ImgUrl = (identifiedVilla.ImgUrl != villaDetails.ImgUrl) 
+            ? villaDetails.ImgUrl : identifiedVilla.ImgUrl;
+        identifiedVilla.Amenity = (identifiedVilla.Amenity != villaDetails.Amenity) 
+            ? villaDetails.Amenity : identifiedVilla.Amenity;
         identifiedVilla.Updated = DateTime.Now;
         
         _db.Villas.Update(identifiedVilla);
