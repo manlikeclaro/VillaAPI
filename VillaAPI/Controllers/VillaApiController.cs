@@ -2,8 +2,10 @@
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using VillaAPI.Data;
 using VillaAPI.Models;
 using VillaAPI.Models.Dto;
+using IVillaRepository = VillaAPI.Repository.IRepository.IVillaRepository;
 
 namespace VillaAPI.Controllers;
 
@@ -12,25 +14,25 @@ namespace VillaAPI.Controllers;
 public class VillaApiController : ControllerBase
 {
     private readonly ILogger<VillaApiController> _logger;
-    private readonly ApplicationDbContext _db;
+    private readonly IVillaRepository _dbVilla;
     private readonly IMapper _mapper;
 
-    public VillaApiController(ILogger<VillaApiController> logger, ApplicationDbContext db, IMapper mapper)
+    public VillaApiController(ILogger<VillaApiController> logger, IVillaRepository dbVilla, IMapper mapper)
     {
         _logger = logger;
-        _db = db;
+        _dbVilla = dbVilla;
         _mapper = mapper;
     }
 
     // GET: api/VillaApi
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult<VillaDto> GetVillas()
+    public async Task<ActionResult<VillaDto>> GetVillas()
     {
         // Return all villas
-        var villas = _db.Villas.ToList();
-        _logger.LogInformation($"Successfully retrieved {villas.Count} villas");
+        var villas = await _dbVilla.GetAllAsync();
         var mappedVillas = _mapper.Map<List<VillaDto>>(villas);
+        _logger.LogInformation($"Successfully retrieved {mappedVillas.Count} villas");
         return Ok(mappedVillas);
     }
 
@@ -39,7 +41,7 @@ public class VillaApiController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult<VillaDto> GetVilla(int id)
+    public async Task<ActionResult<VillaDto>> GetVilla(int id)
     {
         // Validate the Id
         if (id <= 0)
@@ -49,7 +51,7 @@ public class VillaApiController : ControllerBase
         }
 
         // Find the villa by Id
-        var villa = _db.Villas.FirstOrDefault(u => u.Id == id);
+        var villa = await _dbVilla.GetAsync(u => u.Id == id);
         if (villa == null)
         {
             _logger.LogWarning($"Villa with ID {id} not found");
@@ -66,7 +68,7 @@ public class VillaApiController : ControllerBase
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public ActionResult<VillaDto> CreateVilla([FromBody] VillaCreateDto villaDetails)
+    public async Task<ActionResult<VillaDto>> CreateVilla([FromBody] VillaCreateDto villaDetails)
     {
         // Validate the request body
         if (!ModelState.IsValid)
@@ -76,7 +78,7 @@ public class VillaApiController : ControllerBase
         }
 
         // Check if a villa with the same name already exists
-        var nameExists = _db.Villas.FirstOrDefault(u => u.Name.ToLower() == villaDetails.Name.ToLower());
+        var nameExists = await _dbVilla.GetAsync(u => u.Name.ToLower() == villaDetails.Name.ToLower());
         if (nameExists != null)
         {
             _logger.LogWarning($"Villa with name '{villaDetails.Name}' already exists");
@@ -87,8 +89,7 @@ public class VillaApiController : ControllerBase
         var villaModel = _mapper.Map<Villa>(villaDetails);
 
         // Add the new villa to the store
-        _db.Villas.Add(villaModel);
-        _db.SaveChanges();
+        await _dbVilla.CreateAsync(villaModel);
 
         // Return the created villa
         _logger.LogInformation($"Successfully created villa with ID: {villaModel.Id}");
@@ -100,7 +101,7 @@ public class VillaApiController : ControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public IActionResult DeleteVilla(int id)
+    public async Task<IActionResult> DeleteVilla(int id)
     {
         // Validate the Id
         if (id <= 0)
@@ -110,7 +111,7 @@ public class VillaApiController : ControllerBase
         }
 
         // Find the villa by Id
-        var identifiedVilla = _db.Villas.FirstOrDefault(u => u.Id == id);
+        var identifiedVilla = await _dbVilla.GetAsync(u => u.Id == id);
         if (identifiedVilla == null)
         {
             _logger.LogWarning($"Villa with ID {id} not found");
@@ -118,8 +119,7 @@ public class VillaApiController : ControllerBase
         }
 
         // Remove the villa from the store
-        _db.Villas.Remove(identifiedVilla);
-        _db.SaveChanges();
+        await _dbVilla.RemoveAsync(identifiedVilla);
 
         // Return no content status
         _logger.LogInformation($"Successfully deleted villa with ID: {id}");
@@ -132,7 +132,7 @@ public class VillaApiController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public ActionResult<VillaDto> UpdateVilla(int id, JsonPatchDocument<VillaUpdateDto> updatedVilla)
+    public async Task<ActionResult<VillaDto>> UpdateVilla(int id, JsonPatchDocument<VillaUpdateDto> updatedVilla)
     {
         // Validate the Id
         if (id <= 0)
@@ -142,7 +142,7 @@ public class VillaApiController : ControllerBase
         }
 
         // Find the villa by Id
-        var existingVilla = _db.Villas.FirstOrDefault(u => u.Id == id);
+        var existingVilla = await _dbVilla.GetAsync(u => u.Id == id);
         if (existingVilla == null)
         {
             _logger.LogWarning($"Villa with ID {id} not found");
@@ -164,10 +164,9 @@ public class VillaApiController : ControllerBase
         
         // Map changes from DTO back to the entity
         _mapper.Map(villaToUpdateDto, existingVilla);
-        existingVilla.Updated = DateTime.Now; // Update the Updated property as needed
 
         // Check for name conflicts
-        var nameExists = _db.Villas.FirstOrDefault(u => u.Name.ToLower() == existingVilla.Name.ToLower());
+        var nameExists = await _dbVilla.GetAsync(u => u.Name.ToLower() == existingVilla.Name.ToLower());
         if (nameExists != null && nameExists.Id != id)
         {
             _logger.LogWarning($"Villa with name '{existingVilla.Name}' already exists");
@@ -176,7 +175,7 @@ public class VillaApiController : ControllerBase
         }
 
         // Save changes to the database
-        _db.SaveChanges();
+        await _dbVilla.UpdateAsync(existingVilla);
         
         // Return the updated villa
         _logger.LogInformation($"Successfully updated villa with ID: {id}");
@@ -189,7 +188,7 @@ public class VillaApiController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult<VillaDto> PutVilla(int id, [FromBody] VillaUpdateDto villaDetails)
+    public async Task<ActionResult<VillaDto>> PutVilla(int id, [FromBody] VillaUpdateDto villaDetails)
     {
         // Validate the Id
         if (id <= 0)
@@ -199,7 +198,7 @@ public class VillaApiController : ControllerBase
         }
 
         // Find the villa by Id
-        var existingVilla = _db.Villas.FirstOrDefault(u => u.Id == id);
+        var existingVilla = await _dbVilla.GetAsync(u => u.Id == id);
         if (existingVilla == null)
         {
             _logger.LogWarning($"Villa with ID {id} not found");
@@ -207,7 +206,7 @@ public class VillaApiController : ControllerBase
         }
 
         // Check if a villa with the same name already exists
-        var nameExists = _db.Villas.FirstOrDefault(u => u.Name.ToLower() == villaDetails.Name.ToLower());
+        var nameExists = await _dbVilla.GetAsync(u => u.Name.ToLower() == villaDetails.Name.ToLower());
         if (nameExists != null && nameExists.Id != id)
         {
             _logger.LogWarning($"Villa with name '{villaDetails.Name}' already exists");
@@ -217,10 +216,9 @@ public class VillaApiController : ControllerBase
         
         // Use AutoMapper to map VillaUpdateDto to existing Villa entity
         _mapper.Map(villaDetails, existingVilla);
-        existingVilla.Updated = DateTime.Now;
         
         // Save changes to the database
-        _db.SaveChanges();
+        await _dbVilla.UpdateAsync(existingVilla);
 
         // Return the updated villa
         _logger.LogInformation($"Successfully updated villa with ID: {id}");

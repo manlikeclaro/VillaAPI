@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using VillaAPI.Models;
 
-namespace VillaAPI.Models;
+namespace VillaAPI.Data;
 
 public class ApplicationDbContext : DbContext
 {
