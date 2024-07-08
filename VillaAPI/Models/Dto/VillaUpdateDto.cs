@@ -5,7 +5,7 @@ namespace VillaAPI.Models.Dto;
 public class VillaUpdateDto
 {
     [Required] [MaxLength(30)] public string Name { get; set; }
-    [Required] [MaxLength(50)] public string Details { get; set; }
+    [Required] [MaxLength(100)] public string Details { get; set; }
     [Required] [Range(1, 10000)] public decimal Rate { get; set; }
     [Required] [Range(100, 10000)] public int SquareFeet { get; set; }
     [Required] [Range(1, 20)] public int Occupancy { get; set; }

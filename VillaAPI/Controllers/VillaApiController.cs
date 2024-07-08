@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.JsonPatch;
+﻿using AutoMapper;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using VillaAPI.Models;
 using VillaAPI.Models.Dto;
 
@@ -11,11 +13,13 @@ public class VillaApiController : ControllerBase
 {
     private readonly ILogger<VillaApiController> _logger;
     private readonly ApplicationDbContext _db;
+    private readonly IMapper _mapper;
 
-    public VillaApiController(ILogger<VillaApiController> logger, ApplicationDbContext db)
+    public VillaApiController(ILogger<VillaApiController> logger, ApplicationDbContext db, IMapper mapper)
     {
         _logger = logger;
         _db = db;
+        _mapper = mapper;
     }
 
     // GET: api/VillaApi
@@ -26,7 +30,8 @@ public class VillaApiController : ControllerBase
         // Return all villas
         var villas = _db.Villas.ToList();
         _logger.LogInformation($"Successfully retrieved {villas.Count} villas");
-        return Ok(villas);
+        var mappedVillas = _mapper.Map<List<VillaDto>>(villas);
+        return Ok(mappedVillas);
     }
 
     // GET: api/VillaApi/{id}
@@ -53,7 +58,8 @@ public class VillaApiController : ControllerBase
 
         // Return the found villa
         _logger.LogInformation($"Successfully retrieved villa with ID: {id}");
-        return Ok(villa);
+        var mappedVilla = _mapper.Map<VillaDto>(villa);
+        return Ok(mappedVilla);
     }
 
     // POST: api/VillaApi
@@ -78,17 +84,7 @@ public class VillaApiController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var villaModel = new Villa()
-        {
-            Name = villaDetails.Name,
-            Details = villaDetails.Details,
-            Rate = villaDetails.Rate,
-            SquareFeet = villaDetails.SquareFeet,
-            Occupancy = villaDetails.Occupancy,
-            ImgUrl = villaDetails.ImgUrl,
-            Amenity = villaDetails.Amenity,
-            Created = DateTime.Now,
-        };
+        var villaModel = _mapper.Map<Villa>(villaDetails);
 
         // Add the new villa to the store
         _db.Villas.Add(villaModel);
@@ -146,55 +142,46 @@ public class VillaApiController : ControllerBase
         }
 
         // Find the villa by Id
-        var identifiedVilla = _db.Villas.FirstOrDefault(u => u.Id == id);
-        if (identifiedVilla == null)
+        var existingVilla = _db.Villas.FirstOrDefault(u => u.Id == id);
+        if (existingVilla == null)
         {
             _logger.LogWarning($"Villa with ID {id} not found");
             return NotFound();
         }
-
-        // Create a copy to apply the patch and check conflicts
-        var originalVilla = new VillaUpdateDto()
-        {
-            Name = identifiedVilla.Name,
-            Details = identifiedVilla.Details,
-            Rate = identifiedVilla.Rate,
-            SquareFeet = identifiedVilla.SquareFeet,
-            Occupancy = identifiedVilla.Occupancy,
-            ImgUrl = identifiedVilla.ImgUrl,
-            Amenity = identifiedVilla.Amenity
-        };
-        updatedVilla.ApplyTo(originalVilla, ModelState);
-
-        // Check for name conflicts
-        var nameExists = _db.Villas.FirstOrDefault(u => u.Name.ToLower() == originalVilla.Name.ToLower());
-        if (nameExists != null && nameExists.Id != id)
-        {
-            _logger.LogWarning($"Villa with name '{originalVilla.Name}' already exists");
-            ModelState.AddModelError("Validation Error", $"The name '{originalVilla.Name}' already exists!");
-            return Conflict(ModelState);
-        }
-
-        // Map changes from DTO back to entity
-        identifiedVilla.Name = originalVilla.Name;
-        identifiedVilla.Details = originalVilla.Details;
-        identifiedVilla.Rate = originalVilla.Rate;
-        identifiedVilla.SquareFeet = originalVilla.SquareFeet;
-        identifiedVilla.Occupancy = originalVilla.Occupancy;
-        identifiedVilla.ImgUrl = originalVilla.ImgUrl;
-        identifiedVilla.Amenity = originalVilla.Amenity;
-        identifiedVilla.Updated = DateTime.Now;
         
+        // Use AutoMapper to map the existing Villa entity to VillaUpdateDto
+        var villaToUpdateDto = _mapper.Map<VillaUpdateDto>(existingVilla);
+
+        // Apply patch document to the DTO
+        updatedVilla.ApplyTo(villaToUpdateDto, ModelState);
+        
+        // Check for ModelState errors after applying patch
         if (!ModelState.IsValid)
         {
             _logger.LogError("Invalid model state for updating villa");
             return BadRequest(ModelState);
         }
-        _db.SaveChanges();
+        
+        // Map changes from DTO back to the entity
+        _mapper.Map(villaToUpdateDto, existingVilla);
+        existingVilla.Updated = DateTime.Now; // Update the Updated property as needed
 
+        // Check for name conflicts
+        var nameExists = _db.Villas.FirstOrDefault(u => u.Name.ToLower() == existingVilla.Name.ToLower());
+        if (nameExists != null && nameExists.Id != id)
+        {
+            _logger.LogWarning($"Villa with name '{existingVilla.Name}' already exists");
+            ModelState.AddModelError("Validation Error", $"The name '{existingVilla.Name}' already exists!");
+            return Conflict(ModelState);
+        }
+
+        // Save changes to the database
+        _db.SaveChanges();
+        
         // Return the updated villa
         _logger.LogInformation($"Successfully updated villa with ID: {id}");
-        return Ok(identifiedVilla);
+        var updatedVillaDto = _mapper.Map<VillaDto>(existingVilla);
+        return Ok(updatedVillaDto);
     }
 
     // PUT: api/VillaApi/{id}
@@ -212,8 +199,8 @@ public class VillaApiController : ControllerBase
         }
 
         // Find the villa by Id
-        var identifiedVilla = _db.Villas.FirstOrDefault(u => u.Id == id);
-        if (identifiedVilla == null)
+        var existingVilla = _db.Villas.FirstOrDefault(u => u.Id == id);
+        if (existingVilla == null)
         {
             _logger.LogWarning($"Villa with ID {id} not found");
             return NotFound();
@@ -227,29 +214,17 @@ public class VillaApiController : ControllerBase
             ModelState.AddModelError("Validation Error", $"The name '{villaDetails.Name}' already exists!");
             return Conflict(ModelState);
         }
-
-        // Update the villa details
-        identifiedVilla.Name = (identifiedVilla.Name != villaDetails.Name) 
-            ? villaDetails.Name : identifiedVilla.Name;
-        identifiedVilla.Details = (identifiedVilla.Details != villaDetails.Details) 
-            ? villaDetails.Details : identifiedVilla.Details;
-        identifiedVilla.Rate = (identifiedVilla.Rate != villaDetails.Rate) 
-            ? villaDetails.Rate : identifiedVilla.Rate;
-        identifiedVilla.SquareFeet = (identifiedVilla.SquareFeet != villaDetails.SquareFeet) 
-            ? villaDetails.SquareFeet : identifiedVilla.SquareFeet;
-        identifiedVilla.Occupancy = (identifiedVilla.Occupancy != villaDetails.Occupancy) 
-            ? villaDetails.Occupancy : identifiedVilla.Occupancy;
-        identifiedVilla.ImgUrl = (identifiedVilla.ImgUrl != villaDetails.ImgUrl) 
-            ? villaDetails.ImgUrl : identifiedVilla.ImgUrl;
-        identifiedVilla.Amenity = (identifiedVilla.Amenity != villaDetails.Amenity) 
-            ? villaDetails.Amenity : identifiedVilla.Amenity;
-        identifiedVilla.Updated = DateTime.Now;
         
-        _db.Villas.Update(identifiedVilla);
+        // Use AutoMapper to map VillaUpdateDto to existing Villa entity
+        _mapper.Map(villaDetails, existingVilla);
+        existingVilla.Updated = DateTime.Now;
+        
+        // Save changes to the database
         _db.SaveChanges();
 
         // Return the updated villa
         _logger.LogInformation($"Successfully updated villa with ID: {id}");
-        return Ok(identifiedVilla);
+        var updatedVillaDto = _mapper.Map<VillaDto>(existingVilla);
+        return Ok(updatedVillaDto);
     }
 }

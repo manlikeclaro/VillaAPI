@@ -12,7 +12,7 @@ public class Villa
     [Required] [MaxLength(30)] 
     public string Name { get; set; }
     
-    [Required] [MaxLength(50)] 
+    [Required] [MaxLength(100)] 
     public string Details { get; set; }
     
     [Range(1, 10000)] 
