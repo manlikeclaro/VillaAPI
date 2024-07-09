@@ -29,11 +29,18 @@ public class VillaApiController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<VillaDto>> GetVillas()
     {
-        // Return all villas
-        var villas = await _dbVilla.GetAllAsync();
-        var mappedVillas = _mapper.Map<List<VillaDto>>(villas);
-        _logger.LogInformation($"Successfully retrieved {mappedVillas.Count} villas");
-        return Ok(mappedVillas);
+        try
+        {
+            var villas = await _dbVilla.GetAllAsync();
+            var mappedVillas = _mapper.Map<List<VillaDto>>(villas);
+            _logger.LogInformation($"Successfully retrieved {mappedVillas.Count} villas");
+            return Ok(mappedVillas);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to retrieve villas: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to retrieve villas");
+        }
     }
 
     // GET: api/VillaApi/{id}
@@ -43,25 +50,33 @@ public class VillaApiController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<VillaDto>> GetVilla(int id)
     {
-        // Validate the Id
-        if (id <= 0)
+        try
         {
-            _logger.LogError("Invalid ID provided");
-            return BadRequest(new { Error = "Invalid ID provided" });
-        }
+            // Validate the Id
+            if (id <= 0)
+            {
+                _logger.LogError("Invalid ID provided");
+                return BadRequest(new { Error = "Invalid ID provided" });
+            }
 
-        // Find the villa by Id
-        var villa = await _dbVilla.GetAsync(u => u.Id == id);
-        if (villa == null)
+            // Find the villa by Id
+            var villa = await _dbVilla.GetAsync(u => u.Id == id);
+            if (villa == null)
+            {
+                _logger.LogWarning($"Villa with ID {id} not found");
+                return NotFound();
+            }
+
+            // Return the found villa
+            var mappedVilla = _mapper.Map<VillaDto>(villa);
+            _logger.LogInformation($"Successfully retrieved villa with ID: {id}");
+            return Ok(mappedVilla);
+        }
+        catch (Exception ex)
         {
-            _logger.LogWarning($"Villa with ID {id} not found");
-            return NotFound();
+            _logger.LogError($"Failed to retrieve villa with ID {id}: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Failed to retrieve villa with ID {id}");
         }
-
-        // Return the found villa
-        _logger.LogInformation($"Successfully retrieved villa with ID: {id}");
-        var mappedVilla = _mapper.Map<VillaDto>(villa);
-        return Ok(mappedVilla);
     }
 
     // POST: api/VillaApi
@@ -70,30 +85,39 @@ public class VillaApiController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<VillaDto>> CreateVilla([FromBody] VillaCreateDto villaDetails)
     {
-        // Validate the request body
-        if (!ModelState.IsValid)
+        try
         {
-            _logger.LogError("Invalid model state for creating villa");
-            return BadRequest(ModelState);
-        }
+            // Validate the request body
+            if (!ModelState.IsValid)
+            {
+                _logger.LogError("Invalid model state for creating villa");
+                return BadRequest(ModelState);
+            }
 
-        // Check if a villa with the same name already exists
-        var nameExists = await _dbVilla.GetAsync(u => u.Name.ToLower() == villaDetails.Name.ToLower());
-        if (nameExists != null)
+            // Check if a villa with the same name already exists
+            var nameExists = await _dbVilla.GetAsync(u => u.Name.ToLower() == villaDetails.Name.ToLower());
+            if (nameExists != null)
+            {
+                _logger.LogWarning($"Villa with name '{villaDetails.Name}' already exists");
+                ModelState.AddModelError("Validation Error", $"The name '{villaDetails.Name}' already exists!");
+                return BadRequest(ModelState);
+            }
+
+            // Map changes from DTO to the entity
+            var villaModel = _mapper.Map<Villa>(villaDetails);
+
+            // Add the new villa to the store
+            await _dbVilla.CreateAsync(villaModel);
+
+            // Return the created villa
+            _logger.LogInformation($"Successfully created villa with ID: {villaModel.Id}");
+            return CreatedAtRoute("GetVilla", new { id = villaModel.Id }, villaDetails);
+        }
+        catch (Exception ex)
         {
-            _logger.LogWarning($"Villa with name '{villaDetails.Name}' already exists");
-            ModelState.AddModelError("Validation Error", $"The name '{villaDetails.Name}' already exists!");
-            return BadRequest(ModelState);
+            _logger.LogError($"Failed to create villa: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to create villa");
         }
-
-        var villaModel = _mapper.Map<Villa>(villaDetails);
-
-        // Add the new villa to the store
-        await _dbVilla.CreateAsync(villaModel);
-
-        // Return the created villa
-        _logger.LogInformation($"Successfully created villa with ID: {villaModel.Id}");
-        return CreatedAtRoute("GetVilla", new { id = villaModel.Id }, villaDetails);
     }
 
     // DELETE: api/VillaApi/{id}
@@ -103,27 +127,35 @@ public class VillaApiController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteVilla(int id)
     {
-        // Validate the Id
-        if (id <= 0)
+        try
         {
-            _logger.LogError("Invalid ID provided");
-            return BadRequest(new { Error = "Invalid ID provided" });
-        }
+            // Validate the Id
+            if (id <= 0)
+            {
+                _logger.LogError("Invalid ID provided");
+                return BadRequest(new { Error = "Invalid ID provided" });
+            }
 
-        // Find the villa by Id
-        var identifiedVilla = await _dbVilla.GetAsync(u => u.Id == id);
-        if (identifiedVilla == null)
+            // Find the villa by Id
+            var identifiedVilla = await _dbVilla.GetAsync(u => u.Id == id);
+            if (identifiedVilla == null)
+            {
+                _logger.LogWarning($"Villa with ID {id} not found");
+                return NotFound();
+            }
+
+            // Remove the villa from the store
+            await _dbVilla.RemoveAsync(identifiedVilla);
+
+            // Return no content status
+            _logger.LogInformation($"Successfully deleted villa with ID: {id}");
+            return NoContent();
+        }
+        catch (Exception ex)
         {
-            _logger.LogWarning($"Villa with ID {id} not found");
-            return NotFound();
+            _logger.LogError($"Failed to delete villa with ID {id}: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Failed to delete villa with ID {id}");
         }
-
-        // Remove the villa from the store
-        await _dbVilla.RemoveAsync(identifiedVilla);
-
-        // Return no content status
-        _logger.LogInformation($"Successfully deleted villa with ID: {id}");
-        return NoContent();
     }
 
     // PATCH: api/VillaApi/{id}
@@ -134,60 +166,69 @@ public class VillaApiController : ControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<VillaDto>> UpdateVilla(int id, JsonPatchDocument<VillaUpdateDto> updatedVilla)
     {
-        // Validate the Id
-        if (id <= 0)
+        try
         {
-            _logger.LogError("Invalid ID provided");
-            return BadRequest(new { Error = "Invalid ID provided" });
-        }
+            // Validate the Id
+            if (id <= 0)
+            {
+                _logger.LogError("Invalid ID provided");
+                return BadRequest(new { Error = "Invalid ID provided" });
+            }
 
-        // Find the villa by Id
-        var existingVilla = await _dbVilla.GetAsync(u => u.Id == id);
-        if (existingVilla == null)
-        {
-            _logger.LogWarning($"Villa with ID {id} not found");
-            return NotFound();
-        }
-        
-        // Use AutoMapper to map the existing Villa entity to VillaUpdateDto
-        var villaToUpdateDto = _mapper.Map<VillaUpdateDto>(existingVilla);
+            // Find the villa by Id
+            var existingVilla = await _dbVilla.GetAsync(u => u.Id == id);
+            if (existingVilla == null)
+            {
+                _logger.LogWarning($"Villa with ID {id} not found");
+                return NotFound();
+            }
 
-        // Apply patch document to the DTO
-        updatedVilla.ApplyTo(villaToUpdateDto, ModelState);
-        
-        // Check for ModelState errors after applying patch
-        if (!ModelState.IsValid)
-        {
-            _logger.LogError("Invalid model state for updating villa");
-            return BadRequest(ModelState);
-        }
-        
-        // Manually validate the patched DTO
-        if (!TryValidateModel(villaToUpdateDto))
-        {
-            _logger.LogError("Invalid model state after manual validation");
-            return BadRequest(ModelState);
-        }
-        
-        // Check for name conflicts
-        var nameExists = await _dbVilla.GetAsync(u => u.Name.ToLower() == villaToUpdateDto.Name.ToLower());
-        if (nameExists != null && nameExists.Id != id)
-        {
-            _logger.LogWarning($"Villa with name '{villaToUpdateDto.Name}' already exists");
-            ModelState.AddModelError("Validation Error", $"The name '{villaToUpdateDto.Name}' already exists!");
-            return Conflict(ModelState);
-        }
+            // Use AutoMapper to map the existing Villa entity to VillaUpdateDto
+            var villaToUpdateDto = _mapper.Map<VillaUpdateDto>(existingVilla);
 
-        // Map changes from DTO back to the entity
-        _mapper.Map(villaToUpdateDto, existingVilla);
+            // Apply patch document to the DTO
+            updatedVilla.ApplyTo(villaToUpdateDto, ModelState);
 
-        // Save changes to the database
-        await _dbVilla.UpdateAsync(existingVilla);
-        
-        // Return the updated villa
-        _logger.LogInformation($"Successfully updated villa with ID: {id}");
-        var updatedVillaDto = _mapper.Map<VillaDto>(existingVilla);
-        return Ok(updatedVillaDto);
+            // Check for ModelState errors after applying patch
+            if (!ModelState.IsValid)
+            {
+                _logger.LogError("Invalid model state for updating villa");
+                return BadRequest(ModelState);
+            }
+
+            // Manually validate the patched DTO
+            if (!TryValidateModel(villaToUpdateDto))
+            {
+                _logger.LogError("Invalid model state after manual validation");
+                return BadRequest(ModelState);
+            }
+
+            // Check for name conflicts
+            var nameExists = await _dbVilla.GetAsync(u => u.Name.ToLower() == villaToUpdateDto.Name.ToLower());
+            if (nameExists != null && nameExists.Id != id)
+            {
+                _logger.LogWarning($"Villa with name '{villaToUpdateDto.Name}' already exists");
+                ModelState.AddModelError("Validation Error", $"The name '{villaToUpdateDto.Name}' already exists!");
+                return Conflict(ModelState);
+            }
+
+            // Map changes from DTO back to the entity
+            _mapper.Map(villaToUpdateDto, existingVilla);
+
+            // Save changes to the database
+            await _dbVilla.UpdateAsync(existingVilla);
+
+            // Return the updated villa
+            _logger.LogInformation($"Successfully updated villa with ID: {id}");
+            var updatedVillaDto = _mapper.Map<VillaDto>(existingVilla);
+            return Ok(updatedVillaDto);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Failed to partially update villa with ID {id}: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                $"Failed to partially update villa with ID {id}");
+        }
     }
 
     // PUT: api/VillaApi/{id}
@@ -197,39 +238,47 @@ public class VillaApiController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<VillaDto>> PutVilla(int id, [FromBody] VillaUpdateDto villaDetails)
     {
-        // Validate the Id
-        if (id <= 0)
+        try
         {
-            _logger.LogError("Invalid ID provided");
-            return BadRequest(new { Error = "Invalid ID" });
-        }
+            // Validate the Id
+            if (id <= 0)
+            {
+                _logger.LogError("Invalid ID provided");
+                return BadRequest(new { Error = "Invalid ID" });
+            }
 
-        // Find the villa by Id
-        var existingVilla = await _dbVilla.GetAsync(u => u.Id == id);
-        if (existingVilla == null)
+            // Find the villa by Id
+            var existingVilla = await _dbVilla.GetAsync(u => u.Id == id);
+            if (existingVilla == null)
+            {
+                _logger.LogWarning($"Villa with ID {id} not found");
+                return NotFound();
+            }
+
+            // Check if a villa with the same name already exists
+            var nameExists = await _dbVilla.GetAsync(u => u.Name.ToLower() == villaDetails.Name.ToLower());
+            if (nameExists != null && nameExists.Id != id)
+            {
+                _logger.LogWarning($"Villa with name '{villaDetails.Name}' already exists");
+                ModelState.AddModelError("Validation Error", $"The name '{villaDetails.Name}' already exists!");
+                return Conflict(ModelState);
+            }
+
+            // Use AutoMapper to map VillaUpdateDto to existing Villa entity
+            _mapper.Map(villaDetails, existingVilla);
+
+            // Save changes to the database
+            await _dbVilla.UpdateAsync(existingVilla);
+
+            // Return the updated villa
+            _logger.LogInformation($"Successfully updated villa with ID: {id}");
+            var updatedVillaDto = _mapper.Map<VillaDto>(existingVilla);
+            return Ok(updatedVillaDto);
+        }
+        catch (Exception ex)
         {
-            _logger.LogWarning($"Villa with ID {id} not found");
-            return NotFound();
+            _logger.LogError($"Failed to update villa with ID {id}: {ex.Message}");
+            return StatusCode(StatusCodes.Status500InternalServerError, $"Failed to update villa with ID {id}");
         }
-
-        // Check if a villa with the same name already exists
-        var nameExists = await _dbVilla.GetAsync(u => u.Name.ToLower() == villaDetails.Name.ToLower());
-        if (nameExists != null && nameExists.Id != id)
-        {
-            _logger.LogWarning($"Villa with name '{villaDetails.Name}' already exists");
-            ModelState.AddModelError("Validation Error", $"The name '{villaDetails.Name}' already exists!");
-            return Conflict(ModelState);
-        }
-        
-        // Use AutoMapper to map VillaUpdateDto to existing Villa entity
-        _mapper.Map(villaDetails, existingVilla);
-        
-        // Save changes to the database
-        await _dbVilla.UpdateAsync(existingVilla);
-
-        // Return the updated villa
-        _logger.LogInformation($"Successfully updated villa with ID: {id}");
-        var updatedVillaDto = _mapper.Map<VillaDto>(existingVilla);
-        return Ok(updatedVillaDto);
     }
 }
