@@ -1,4 +1,5 @@
-﻿using AutoMapper;
+﻿using System.Net;
+using AutoMapper;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +17,7 @@ public class VillaApiController : ControllerBase
     private readonly ILogger<VillaApiController> _logger;
     private readonly IVillaRepository _dbVilla;
     private readonly IMapper _mapper;
+    private APIResponse _apiResponse;
 
     public VillaApiController(ILogger<VillaApiController> logger, IVillaRepository dbVilla, IMapper mapper)
     {
@@ -26,15 +28,25 @@ public class VillaApiController : ControllerBase
 
     // GET: api/VillaApi
     [HttpGet]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<VillaDto>> GetVillas()
+    [ProducesResponseType(typeof(APIResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetVillas()
     {
         try
         {
+            // Fetch all villas asynchronously from the database.
             var villas = await _dbVilla.GetAllAsync();
+
+            // Map the villas to the VillaDto objects using AutoMapper.
             var mappedVillas = _mapper.Map<List<VillaDto>>(villas);
+
+            // Log the number of villas retrieved.
             _logger.LogInformation($"Successfully retrieved {mappedVillas.Count} villas");
-            return Ok(mappedVillas);
+
+            // Create a new APIResponse object & return response
+            _apiResponse = new APIResponse(
+                data: mappedVillas
+            );
+            return Ok(_apiResponse);
         }
         catch (Exception ex)
         {
@@ -45,10 +57,10 @@ public class VillaApiController : ControllerBase
 
     // GET: api/VillaApi/{id}
     [HttpGet("{id:int}", Name = "GetVilla")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<VillaDto>> GetVilla(int id)
+    [ProducesResponseType(typeof(APIResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(APIResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(APIResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetVilla(int id)
     {
         try
         {
@@ -56,7 +68,15 @@ public class VillaApiController : ControllerBase
             if (id <= 0)
             {
                 _logger.LogError("Invalid ID provided");
-                return BadRequest(new { Error = "Invalid ID provided" });
+                // return BadRequest(new { Error = "Invalid ID provided" });
+
+                // Create a new APIResponse object & return response
+                _apiResponse = new APIResponse(
+                    statusCode: HttpStatusCode.BadRequest,
+                    isSuccess: false,
+                    errorMessages: ["Invalid ID provided"]
+                );
+                return BadRequest(_apiResponse);
             }
 
             // Find the villa by Id
@@ -64,13 +84,25 @@ public class VillaApiController : ControllerBase
             if (villa == null)
             {
                 _logger.LogWarning($"Villa with ID {id} not found");
-                return NotFound();
+
+                // Create a new APIResponse object & return response
+                _apiResponse = new APIResponse(
+                    statusCode: HttpStatusCode.NotFound,
+                    isSuccess: false,
+                    errorMessages: [$"Villa with ID {id} not found"]
+                );
+                return NotFound(_apiResponse);
             }
 
             // Return the found villa
             var mappedVilla = _mapper.Map<VillaDto>(villa);
             _logger.LogInformation($"Successfully retrieved villa with ID: {id}");
-            return Ok(mappedVilla);
+
+            // Create a new APIResponse object & return response
+            _apiResponse = new APIResponse(
+                data: mappedVilla
+            );
+            return Ok(_apiResponse);
         }
         catch (Exception ex)
         {
@@ -81,9 +113,9 @@ public class VillaApiController : ControllerBase
 
     // POST: api/VillaApi
     [HttpPost]
-    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(APIResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<VillaDto>> CreateVilla([FromBody] VillaCreateDto villaDetails)
+    public async Task<IActionResult> CreateVilla([FromBody] VillaCreateDto villaDetails)
     {
         try
         {
@@ -111,7 +143,14 @@ public class VillaApiController : ControllerBase
 
             // Return the created villa
             _logger.LogInformation($"Successfully created villa with ID: {villaModel.Id}");
-            return CreatedAtRoute("GetVilla", new { id = villaModel.Id }, villaDetails);
+
+            // Create a new APIResponse object & return response
+            _apiResponse = new APIResponse(
+                statusCode: HttpStatusCode.Created,
+                data: villaDetails
+            );
+            return Ok(_apiResponse);
+            // return CreatedAtRoute("GetVilla", new { id = villaModel.Id }, villaDetails);
         }
         catch (Exception ex)
         {
@@ -123,8 +162,8 @@ public class VillaApiController : ControllerBase
     // DELETE: api/VillaApi/{id}
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(APIResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(APIResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteVilla(int id)
     {
         try
@@ -133,7 +172,14 @@ public class VillaApiController : ControllerBase
             if (id <= 0)
             {
                 _logger.LogError("Invalid ID provided");
-                return BadRequest(new { Error = "Invalid ID provided" });
+
+                // Create a new APIResponse object & return response
+                _apiResponse = new APIResponse(
+                    statusCode: HttpStatusCode.BadRequest,
+                    isSuccess: false,
+                    errorMessages: ["Invalid ID provided"]
+                );
+                return BadRequest(_apiResponse);
             }
 
             // Find the villa by Id
@@ -141,7 +187,14 @@ public class VillaApiController : ControllerBase
             if (identifiedVilla == null)
             {
                 _logger.LogWarning($"Villa with ID {id} not found");
-                return NotFound();
+
+                // Create a new APIResponse object & return response
+                _apiResponse = new APIResponse(
+                    statusCode: HttpStatusCode.NotFound,
+                    isSuccess: false,
+                    errorMessages: [$"Villa with ID {id} not found"]
+                );
+                return NotFound(_apiResponse);
             }
 
             // Remove the villa from the store
@@ -149,6 +202,11 @@ public class VillaApiController : ControllerBase
 
             // Return no content status
             _logger.LogInformation($"Successfully deleted villa with ID: {id}");
+
+            // Create a new APIResponse object & return response
+            _apiResponse = new APIResponse(
+                statusCode: HttpStatusCode.NoContent
+            );
             return NoContent();
         }
         catch (Exception ex)
@@ -160,11 +218,11 @@ public class VillaApiController : ControllerBase
 
     // PATCH: api/VillaApi/{id}
     [HttpPatch("{id:int}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(APIResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(APIResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(APIResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<VillaDto>> UpdateVilla(int id, JsonPatchDocument<VillaUpdateDto> updatedVilla)
+    public async Task<IActionResult> UpdateVilla(int id, JsonPatchDocument<VillaUpdateDto> updatedVilla)
     {
         try
         {
@@ -172,7 +230,14 @@ public class VillaApiController : ControllerBase
             if (id <= 0)
             {
                 _logger.LogError("Invalid ID provided");
-                return BadRequest(new { Error = "Invalid ID provided" });
+
+                // Create a new APIResponse object & return response
+                _apiResponse = new APIResponse(
+                    statusCode: HttpStatusCode.BadRequest,
+                    isSuccess: false,
+                    errorMessages: ["Invalid ID provided"]
+                );
+                return BadRequest(_apiResponse);
             }
 
             // Find the villa by Id
@@ -180,7 +245,14 @@ public class VillaApiController : ControllerBase
             if (existingVilla == null)
             {
                 _logger.LogWarning($"Villa with ID {id} not found");
-                return NotFound();
+
+                // Create a new APIResponse object & return response
+                _apiResponse = new APIResponse(
+                    statusCode: HttpStatusCode.NotFound,
+                    isSuccess: false,
+                    errorMessages: [$"Villa with ID {id} not found"]
+                );
+                return NotFound(_apiResponse);
             }
 
             // Use AutoMapper to map the existing Villa entity to VillaUpdateDto
@@ -221,7 +293,12 @@ public class VillaApiController : ControllerBase
             // Return the updated villa
             _logger.LogInformation($"Successfully updated villa with ID: {id}");
             var updatedVillaDto = _mapper.Map<VillaDto>(existingVilla);
-            return Ok(updatedVillaDto);
+
+            // Create a new APIResponse object & return response
+            _apiResponse = new APIResponse(
+                data: updatedVillaDto
+            );
+            return Ok(_apiResponse);
         }
         catch (Exception ex)
         {
@@ -233,10 +310,10 @@ public class VillaApiController : ControllerBase
 
     // PUT: api/VillaApi/{id}
     [HttpPut("{id:int}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<VillaDto>> PutVilla(int id, [FromBody] VillaUpdateDto villaDetails)
+    [ProducesResponseType(typeof(APIResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(APIResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(APIResponse), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PutVilla(int id, [FromBody] VillaUpdateDto villaDetails)
     {
         try
         {
@@ -244,7 +321,14 @@ public class VillaApiController : ControllerBase
             if (id <= 0)
             {
                 _logger.LogError("Invalid ID provided");
-                return BadRequest(new { Error = "Invalid ID" });
+
+                // Create a new APIResponse object & return response
+                _apiResponse = new APIResponse(
+                    statusCode: HttpStatusCode.BadRequest,
+                    isSuccess: false,
+                    errorMessages: ["Invalid ID provided"]
+                );
+                return BadRequest(_apiResponse);
             }
 
             // Find the villa by Id
@@ -252,7 +336,14 @@ public class VillaApiController : ControllerBase
             if (existingVilla == null)
             {
                 _logger.LogWarning($"Villa with ID {id} not found");
-                return NotFound();
+
+                // Create a new APIResponse object & return response
+                _apiResponse = new APIResponse(
+                    statusCode: HttpStatusCode.NotFound,
+                    isSuccess: false,
+                    errorMessages: [$"Villa with ID {id} not found"]
+                );
+                return NotFound(_apiResponse);
             }
 
             // Check if a villa with the same name already exists
@@ -273,7 +364,12 @@ public class VillaApiController : ControllerBase
             // Return the updated villa
             _logger.LogInformation($"Successfully updated villa with ID: {id}");
             var updatedVillaDto = _mapper.Map<VillaDto>(existingVilla);
-            return Ok(updatedVillaDto);
+
+            // Create a new APIResponse object & return response
+            _apiResponse = new APIResponse(
+                data: updatedVillaDto
+            );
+            return Ok(_apiResponse);
         }
         catch (Exception ex)
         {
