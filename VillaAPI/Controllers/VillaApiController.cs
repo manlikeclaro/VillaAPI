@@ -162,17 +162,24 @@ public class VillaApiController : ControllerBase
             return BadRequest(ModelState);
         }
         
-        // Map changes from DTO back to the entity
-        _mapper.Map(villaToUpdateDto, existingVilla);
-
+        // Manually validate the patched DTO
+        if (!TryValidateModel(villaToUpdateDto))
+        {
+            _logger.LogError("Invalid model state after manual validation");
+            return BadRequest(ModelState);
+        }
+        
         // Check for name conflicts
-        var nameExists = await _dbVilla.GetAsync(u => u.Name.ToLower() == existingVilla.Name.ToLower());
+        var nameExists = await _dbVilla.GetAsync(u => u.Name.ToLower() == villaToUpdateDto.Name.ToLower());
         if (nameExists != null && nameExists.Id != id)
         {
-            _logger.LogWarning($"Villa with name '{existingVilla.Name}' already exists");
-            ModelState.AddModelError("Validation Error", $"The name '{existingVilla.Name}' already exists!");
+            _logger.LogWarning($"Villa with name '{villaToUpdateDto.Name}' already exists");
+            ModelState.AddModelError("Validation Error", $"The name '{villaToUpdateDto.Name}' already exists!");
             return Conflict(ModelState);
         }
+
+        // Map changes from DTO back to the entity
+        _mapper.Map(villaToUpdateDto, existingVilla);
 
         // Save changes to the database
         await _dbVilla.UpdateAsync(existingVilla);
