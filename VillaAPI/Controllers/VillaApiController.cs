@@ -2,16 +2,14 @@
 using AutoMapper;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using VillaAPI.Data;
 using VillaAPI.Models;
-using VillaAPI.Models.Dto;
+using VillaAPI.Models.Dto.Villa;
 using IVillaRepository = VillaAPI.Repository.IRepository.IVillaRepository;
 
 namespace VillaAPI.Controllers;
 
 [ApiController]
-[Route("api/VillaApi")]
+[Route("api/Villas")]
 public class VillaApiController : ControllerBase
 {
     private readonly ILogger<VillaApiController> _logger;
@@ -64,22 +62,21 @@ public class VillaApiController : ControllerBase
     {
         try
         {
-            // Validate the Id
+            // Validate the ID
             if (id <= 0)
             {
                 _logger.LogError("Invalid ID provided");
-                // return BadRequest(new { Error = "Invalid ID provided" });
-
+               
                 // Create a new APIResponse object & return response
                 _apiResponse = new APIResponse(
                     statusCode: HttpStatusCode.BadRequest,
                     isSuccess: false,
-                    errorMessages: ["Invalid ID provided"]
+                    errorMessages: ["Invalid Id Provided!"]
                 );
                 return BadRequest(_apiResponse);
             }
 
-            // Find the villa by Id
+            // Find the villa by ID
             var villa = await _dbVilla.GetAsync(u => u.Id == id);
             if (villa == null)
             {
@@ -168,7 +165,7 @@ public class VillaApiController : ControllerBase
     {
         try
         {
-            // Validate the Id
+            // Validate the ID
             if (id <= 0)
             {
                 _logger.LogError("Invalid ID provided");
@@ -182,7 +179,7 @@ public class VillaApiController : ControllerBase
                 return BadRequest(_apiResponse);
             }
 
-            // Find the villa by Id
+            // Find the villa by ID
             var identifiedVilla = await _dbVilla.GetAsync(u => u.Id == id);
             if (identifiedVilla == null)
             {
@@ -226,7 +223,7 @@ public class VillaApiController : ControllerBase
     {
         try
         {
-            // Validate the Id
+            // Validate the ID
             if (id <= 0)
             {
                 _logger.LogError("Invalid ID provided");
@@ -240,7 +237,7 @@ public class VillaApiController : ControllerBase
                 return BadRequest(_apiResponse);
             }
 
-            // Find the villa by Id
+            // Find the villa by ID
             var existingVilla = await _dbVilla.GetAsync(u => u.Id == id);
             if (existingVilla == null)
             {
@@ -317,7 +314,7 @@ public class VillaApiController : ControllerBase
     {
         try
         {
-            // Validate the Id
+            // Validate the ID
             if (id <= 0)
             {
                 _logger.LogError("Invalid ID provided");
@@ -331,7 +328,7 @@ public class VillaApiController : ControllerBase
                 return BadRequest(_apiResponse);
             }
 
-            // Find the villa by Id
+            // Find the villa by ID
             var existingVilla = await _dbVilla.GetAsync(u => u.Id == id);
             if (existingVilla == null)
             {

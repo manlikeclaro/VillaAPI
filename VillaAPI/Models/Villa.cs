@@ -5,8 +5,7 @@ namespace VillaAPI.Models;
 
 public class Villa
 {
-    [Key] 
-    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    [Key] [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
     public int Id { get; set; }
     
     [Required] [MaxLength(30)] 

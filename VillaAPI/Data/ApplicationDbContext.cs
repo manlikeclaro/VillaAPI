@@ -10,6 +10,7 @@ public class ApplicationDbContext : DbContext
     }
 
     public DbSet<Villa> Villas { get; set; }
+    public DbSet<VillaNumber> VillaNumbers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -104,6 +105,13 @@ public class ApplicationDbContext : DbContext
                 Id = 15, Name = "Countryside Estate", Details = "An estate in the countryside.", Rate = 4500,
                 SquareFeet = 3200, Occupancy = 10, ImgUrl = "http://example.com/villa15.jpg",
                 Amenity = "Garden, Wi-Fi, BBQ", Created = DateTime.Now
+            }
+        );
+        
+        modelBuilder.Entity<VillaNumber>().HasData(
+            new VillaNumber()
+            {
+                VillaNo = 101, Details = "Disabled Access", Created = DateTime.Now, Updated = null
             }
         );
     }

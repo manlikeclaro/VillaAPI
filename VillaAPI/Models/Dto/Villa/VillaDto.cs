@@ -1,4 +1,4 @@
-﻿namespace VillaAPI.Models.Dto;
+﻿namespace VillaAPI.Models.Dto.Villa;
 
 public class VillaDto
 {
