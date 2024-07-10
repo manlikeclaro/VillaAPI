@@ -18,5 +18,5 @@ public class VillaNumber
     [ForeignKey("Villa")] public int VillaId { get; set; }
 
     // Navigation property
-    public Villa Villa { get; set; }
+    // public Villa Villa { get; set; }
 }

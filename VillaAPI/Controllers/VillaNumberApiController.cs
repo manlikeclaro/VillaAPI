@@ -12,14 +12,16 @@ namespace VillaAPI.Controllers;
 public class VillaNumberApiController : ControllerBase
 {
     private readonly IVillaNumberRepository _dbVillaNumber;
+    private readonly IVillaRepository _dbVilla;
     private readonly IMapper _mapper;
     private readonly ILogger<VillaNumberApiController> _logger;
     private APIResponse? _apiResponse;
 
-    public VillaNumberApiController(IVillaNumberRepository dbVillaNumber, IMapper mapper,
-        ILogger<VillaNumberApiController> logger)
+    public VillaNumberApiController(IVillaNumberRepository dbVillaNumber, IVillaRepository dbVilla,
+        IMapper mapper, ILogger<VillaNumberApiController> logger)
     {
         _dbVillaNumber = dbVillaNumber;
+        _dbVilla = dbVilla;
         _mapper = mapper;
         _logger = logger;
     }
@@ -125,12 +127,28 @@ public class VillaNumberApiController : ControllerBase
     // POST: api/VillaNumbers
     [HttpPost]
     [ProducesResponseType(typeof(APIResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(APIResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateVillaNumber([FromBody] VillaNumberCreateDto villaNumberDetails)
     {
         try
         {
+            // Validate villa exists
+            var villaExists = await _dbVilla.GetAsync(u => u.Id == villaNumberDetails.VillaId);
+            if (villaExists == null)
+            {
+                _logger.LogError($"The Villa with ID number {villaNumberDetails.VillaId} not found");
+
+                // Create a new APIResponse object & return response
+                _apiResponse = new APIResponse(
+                    statusCode: HttpStatusCode.NotFound,
+                    isSuccess: false,
+                    errorMessages: [$"The Villa with ID number {villaNumberDetails.VillaId} not found"]
+                );
+                return NotFound(_apiResponse);
+            }
+
             // Validate the request body
             if (!ModelState.IsValid)
             {
@@ -186,7 +204,7 @@ public class VillaNumberApiController : ControllerBase
             if (id <= 0)
             {
                 _logger.LogError("Invalid ID provided");
-            
+
                 // Create a new APIResponse object & return response
                 _apiResponse = new APIResponse(
                     statusCode: HttpStatusCode.BadRequest,
@@ -246,7 +264,7 @@ public class VillaNumberApiController : ControllerBase
             if (id <= 0)
             {
                 _logger.LogError("Invalid ID provided");
-            
+
                 // Create a new APIResponse object & return response
                 _apiResponse = new APIResponse(
                     statusCode: HttpStatusCode.BadRequest,
@@ -260,13 +278,28 @@ public class VillaNumberApiController : ControllerBase
             var villa = await _dbVillaNumber.GetAsync(u => u.VillaNo == id);
             if (villa == null)
             {
-                _logger.LogError($"Villa with id {id} not found");
+                _logger.LogError($"Villa number {id} not found");
 
                 // Create a new APIResponse object & return response
                 _apiResponse = new APIResponse(
                     statusCode: HttpStatusCode.NotFound,
                     isSuccess: false,
-                    errorMessages: [$"Villa with id {id} not found"]
+                    errorMessages: [$"Villa number {id} not found"]
+                );
+                return NotFound(_apiResponse);
+            }
+
+            // Validate villa exists
+            var villaExists = await _dbVilla.GetAsync(u => u.Id == villaNumberUpdateDto.VillaId);
+            if (villaExists == null)
+            {
+                _logger.LogError($"The Villa with ID number {villaNumberUpdateDto.VillaId} not found");
+
+                // Create a new APIResponse object & return response
+                _apiResponse = new APIResponse(
+                    statusCode: HttpStatusCode.NotFound,
+                    isSuccess: false,
+                    errorMessages: [$"The Villa with ID number {villaNumberUpdateDto.VillaId} not found"]
                 );
                 return NotFound(_apiResponse);
             }
