@@ -18,6 +18,7 @@ public class VillaRepository : Repository<Villa>, IVillaRepository
     public new async Task CreateAsync(Villa entity)
     {
         entity.Created = DateTime.Now; // Set the Created date
+        entity.Updated = null; // Set the Update date
         await _dbSet.AddAsync(entity);
         await SaveAsync();
     }
