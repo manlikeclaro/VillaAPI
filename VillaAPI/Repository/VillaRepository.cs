@@ -1,6 +1,4 @@
-﻿using System.Linq.Expressions;
-using Microsoft.EntityFrameworkCore;
-using VillaAPI.Data;
+﻿using VillaAPI.Data;
 using VillaAPI.Models;
 using VillaAPI.Repository.IRepository;
 
